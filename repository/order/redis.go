@@ -14,39 +14,37 @@ type RedisRepo struct {
 	Client *redis.Client
 }
 
+var ErrNotExist = errors.New("order does not exist")
+
 func orderIDKey(id uint64) string {
 	return fmt.Sprintf("order:%d", id)
 }
 
 func (r *RedisRepo) Insert(ctx context.Context, order model.Order) error {
 	data, err := json.Marshal(order)
-
 	if err != nil {
-		return fmt.Errorf("failed to marshal order: %w", err)
+		return fmt.Errorf("failed to encode order: %w", err)
 	}
 
 	key := orderIDKey(order.OrderID)
 
 	txn := r.Client.TxPipeline()
-	// txn.Set(ctx, key, string(data), 0)
-	// txn.SAdd(ctx, key, string(data), 0)
-	// txn.Exec(ctx)
 
 	res := txn.SetNX(ctx, key, string(data), 0)
-
 	if err := res.Err(); err != nil {
 		txn.Discard()
-		return fmt.Errorf("failed to set order: %w", err)
+		return fmt.Errorf("failed to set: %w", err)
 	}
 
-	if err := txn.SAdd(ctx, key, string(data), 0).Err(); err != nil {
+	if err := txn.SAdd(ctx, "orders", key).Err(); err != nil {
 		txn.Discard()
-		return fmt.Errorf("failed to add order to order sets: %w", err)
+		return fmt.Errorf("failed to add to orders set: %w", err) // REVIEW this return will replace by txn discard with general error "failed to exec"
 	}
 
 	if _, err := txn.Exec(ctx); err != nil {
-		return fmt.Errorf("failed to execute transaction: %w", err)
+		return fmt.Errorf("failed to exec: %w", err)
 	}
+
 	return nil
 }
 
