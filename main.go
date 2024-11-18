@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	app := app.New()
+	app := app.New(app.LoadConfig())
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
